@@ -1,0 +1,100 @@
+---
+title: "Movember 2"
+author: "CB - MC"
+date: "2/26/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(dplyr)
+library(jtools)
+library(interactions)
+```
+
+## Definition de segments
+
+On crée la table twittos pour définir les segments en fonction du nombre de tweets
+
+```{r}
+twittos<-df %>% 
+  mutate(n=1) %>% 
+  group_by(screen_name) %>% 
+  summarise(nb_tweetso = sum(n))
+twittos<-twittos %>% mutate(Twittos=ifelse(nb_tweetso==1,"Ponctuels", 
+                                           ifelse(nb_tweetso>1 & nb_tweetso<6, "Récidivistes", 
+                                                  ifelse(nb_tweetso>5 & nb_tweetso<10,"Fidèles","Superposteurs"))))
+```
+
+## Ajout d'un colonne segments Twittos à la table pricipale
+
+```{r}
+#df<-readRDS("df_nrc.rds")
+df <- df_nrc
+df <- df %>% inner_join(twittos, by="screen_name")
+```
+
+## Les regression sur l'ensemble des données
+
+```{r}
+df$retweet_count_l<-log(df$retweet_count+1)
+m0<-lm(retweet_count_l~positive*negative,data=df)
+m1<-lm(retweet_count_l~positive*negative+day,data=df)
+export_summs(m0, m1, scale = TRUE)
+```
+
+
+```{r comp01}
+interact_plot(model = m1, pred = negative,  modx = positive)+labs(title="Interaction des sentiments negatifs et positifs") 
+```
+
+# Regressions par Segments 
+
+## Regressions par Ponctuels
+
+
+```{r}
+df <- df %>% filter(Twittos=="Ponctuels")
+df$retweet_count_l<-log(df$retweet_count+1)
+m0<-lm(retweet_count_l~positive*negative,data=df)
+m1<-lm(retweet_count_l~positive*negative+day,data=df)
+export_summs(m0, m1, scale = TRUE)
+```
+
+
+```{r comp01}
+interact_plot(model = m1, pred = negative,  modx = positive)+labs(title="Interaction des sentiments negatifs et positifs") 
+```
+
+Frequence des tweets par pays total et par segments
+
+```{r}
+sort(table(df[,c("country")]),decreasing = T)
+sort(table(df[df$Twittos=="Ponctuels",c("country")]),decreasing = T)
+sort(table(df[df$Twittos=="Récidivistes",c("country")]),decreasing = T)
+sort(table(df[df$Twittos=="Fidèles",c("country")]),decreasing = T)
+sort(table(df[df$Twittos=="Superposteurs",c("country")]),decreasing = T)
+```
+Fréquence des tweets par date de création du compte
+
+```{r}
+table(as.integer(format(df$account_created_at,"%Y")))
+table(format(df$account_created_at,"%Y")[df$Twittos=="Ponctuels"])
+table(format(df$account_created_at,"%Y")[df$Twittos=="Récidivistes"])
+table(format(df$account_created_at,"%Y")[df$Twittos=="Fidèles"])
+table(format(df$account_created_at,"%Y")[df$Twittos=="Superposteurs"])
+```
+
+Frequence des tweets par nombre de followers du compte. On utilise le logarithme base dix qui se trouve déjà dans la colonne "followers_count_l" pour grouper les twittos par ordre de grandeur de leur nombre de followers (0 = "<10",1 = "10-99",2 = "100-999" etc)
+
+
+```{r}
+followers = df$fol
+table(as.integer(log10(df$followers_count)))
+table(as.integer(log10(df$followers_count))[df$Twittos=="Ponctuels"])
+table(as.integer(log10(df$followers_count))[df$Twittos=="Récidivistes"])
+table(as.integer(log10(df$followers_count))[df$Twittos=="Fidèles"])
+table(as.integer(log10(df$followers_count))[df$Twittos=="Superposteurs"])
+```
+
